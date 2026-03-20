@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Управление задачами (V2)</title>
+    <style>
+      :root {
+        --bg: #0b1220;
+        --card: #121a2b;
+        --text: #e8eefc;
+        --muted: #aab6d3;
+        --accent: #6ea8fe;
+        --danger: #ff6b6b;
+        --border: rgba(255, 255, 255, 0.12);
+        --base-font: 20px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-size: var(--base-font);
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans",
+          "Liberation Sans", sans-serif;
+        background: radial-gradient(1200px 700px at 20% 10%, #162449 0%, var(--bg) 55%);
+        color: var(--text);
+        line-height: 1.4;
+      }
+
+      .wrap {
+        max-width: 720px;
+        margin: 56px auto;
+        padding: 0 18px;
+      }
+
+      h1 {
+        font-size: 34px;
+        margin: 0 0 14px;
+      }
+
+      .sub {
+        color: var(--muted);
+        margin-bottom: 22px;
+        font-size: 18px;
+      }
+
+      .card {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 22px;
+      }
+
+      .row {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+
+      input[type="checkbox"] {
+        width: 26px;
+        height: 26px;
+        accent-color: var(--accent);
+      }
+
+      input[type="text"] {
+        flex: 1;
+        border-radius: 14px;
+        padding: 18px 16px;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.18);
+        color: var(--text);
+        outline: none;
+        font-size: 20px;
+      }
+
+      input[type="text"]::placeholder {
+        color: rgba(170, 182, 211, 0.75);
+      }
+
+      button {
+        border-radius: 14px;
+        padding: 18px 18px;
+        min-height: 54px;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.18);
+        color: var(--text);
+        cursor: pointer;
+        transition: transform 0.05s ease, border-color 0.15s ease, background 0.15s ease;
+        user-select: none;
+        font-size: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      button:hover {
+        border-color: rgba(110, 168, 254, 0.55);
+        background: rgba(110, 168, 254, 0.08);
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      button.primary {
+        background: rgba(110, 168, 254, 0.14);
+        border-color: rgba(110, 168, 254, 0.6);
+      }
+
+      button.danger {
+        border-color: rgba(255, 107, 107, 0.55);
+        background: rgba(255, 107, 107, 0.08);
+      }
+
+      .list {
+        list-style: none;
+        padding: 0;
+        margin: 14px 0 0;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .task {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px 14px;
+        background: rgba(0, 0, 0, 0.12);
+      }
+
+      .task-main {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .task-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 520px;
+      }
+
+      .task.completed .task-text {
+        text-decoration: line-through;
+        color: rgba(232, 238, 252, 0.6);
+      }
+
+      .task-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .empty {
+        color: var(--muted);
+        padding: 14px 2px;
+        font-size: 18px;
+      }
+
+      footer {
+        margin-top: 12px;
+        color: rgba(170, 182, 211, 0.8);
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Управление задачами (V2)</h1>
+      <div class="sub">Список задач на сегодня. Данные сохраняются в браузере.</div>
+
+      <div class="card">
+        <div class="row">
+          <input id="taskInput" type="text" placeholder="Введите задачу..." autocomplete="off" />
+          <button id="addBtn" class="primary" type="button">Добавить</button>
+        </div>
+
+        <ul id="taskList" class="list" aria-label="Список задач"></ul>
+
+        <footer id="footerInfo"></footer>
+      </div>
+    </div>
+
+    <script>
+      const STORAGE_PREFIX = "tasks_";
+
+      const $ = (sel) => document.querySelector(sel);
+
+      function getLocalISODate(d = new Date()) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      }
+
+      function todayKey() {
+        return STORAGE_PREFIX + getLocalISODate();
+      }
+
+      function safeUUID() {
+        if (window.crypto && typeof window.crypto.randomUUID === "function") {
+          return crypto.randomUUID();
+        }
+        return "id_" + Math.random().toString(16).slice(2) + "_" + Date.now().toString(16);
+      }
+
+      function loadTasks() {
+        try {
+          const raw = localStorage.getItem(todayKey());
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) return [];
+          return parsed;
+        } catch {
+          return [];
+        }
+      }
+
+      function saveTasks(tasks) {
+        localStorage.setItem(todayKey(), JSON.stringify(tasks));
+      }
+
+      const state = {
+        tasks: [],
+      };
+
+      function render() {
+        const list = $("#taskList");
+        list.innerHTML = "";
+
+        const tasks = state.tasks;
+        const footer = $("#footerInfo");
+        const dateStr = new Date().toLocaleDateString("ru-RU");
+        footer.textContent = `Дата: ${dateStr}. Всего: ${tasks.length}. Выполнено: ${tasks.filter((t) => t.completed).length}.`;
+
+        if (tasks.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = "Пока нет задач на сегодня.";
+          list.appendChild(empty);
+          return;
+        }
+
+        for (const task of tasks) {
+          const li = document.createElement("li");
+          li.className = "task" + (task.completed ? " completed" : "");
+          li.dataset.id = task.id;
+
+          const main = document.createElement("div");
+          main.className = "task-main";
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = !!task.completed;
+          checkbox.addEventListener("change", () => {
+            task.completed = checkbox.checked;
+            saveTasks(state.tasks);
+            render();
+          });
+
+          const text = document.createElement("div");
+          text.className = "task-text";
+          text.title = task.text;
+          text.textContent = task.text;
+
+          main.appendChild(checkbox);
+          main.appendChild(text);
+
+          const actions = document.createElement("div");
+          actions.className = "task-actions";
+
+          const editBtn = document.createElement("button");
+          editBtn.type = "button";
+          editBtn.textContent = "Изменить";
+          editBtn.addEventListener("click", () => {
+            const next = window.prompt("Изменить задачу:", task.text);
+            if (next === null) return;
+            const trimmed = next.trim();
+            if (!trimmed) {
+              // Если пользователь оставил пусто — просто не сохраняем изменения.
+              return;
+            }
+            task.text = trimmed;
+            saveTasks(state.tasks);
+            render();
+          });
+
+          const delBtn = document.createElement("button");
+          delBtn.type = "button";
+          delBtn.textContent = "Удалить";
+          delBtn.className = "danger";
+          delBtn.addEventListener("click", () => {
+            const ok = window.confirm("Удалить задачу?");
+            if (!ok) return;
+            state.tasks = state.tasks.filter((t) => t.id !== task.id);
+            saveTasks(state.tasks);
+            render();
+          });
+
+          actions.appendChild(editBtn);
+          actions.appendChild(delBtn);
+
+          li.appendChild(main);
+          li.appendChild(actions);
+          list.appendChild(li);
+        }
+      }
+
+      function addTaskFromInput() {
+        const input = $("#taskInput");
+        const value = input.value.trim();
+        if (!value) return;
+
+        state.tasks.unshift({
+          id: safeUUID(),
+          text: value,
+          completed: false,
+          createdAt: Date.now(),
+        });
+
+        saveTasks(state.tasks);
+        input.value = "";
+        input.focus();
+        render();
+      }
+
+      // Init
+      state.tasks = loadTasks();
+      render();
+
+      $("#addBtn").addEventListener("click", addTaskFromInput);
+
+      $("#taskInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") addTaskFromInput();
+      });
+    </script>
+  </body>
+</html>
+

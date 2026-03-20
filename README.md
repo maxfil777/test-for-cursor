@@ -1,1 +1,5 @@
-     # test-for-cursor
+# test-for-cursor
+
+## Как запустить
+
+Откройте файл `index.html` в браузере. Для V2 задачи сохраняются в `localStorage` на дату (например, `tasks_2026-03-20`).
